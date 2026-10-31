@@ -1,0 +1,41 @@
+name: Build Kernel Module
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc flex bison libssl-dev libelf-dev git curl
+
+      - name: Download GKI Kernel (android16-6.12)
+        run: |
+          git clone --depth 1 -b android16-6.12 https://android.googlesource.com/kernel/common kernel-source
+
+      - name: Prepare Kernel
+        run: |
+          cd kernel-source
+          # Faz o download da toolchain Clang do AOSP
+          curl -sL https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz -o clang.tar.gz
+          mkdir clang
+          tar -xzf clang.tar.gz -C clang
+          # Prepara o kernel para compilar módulos externos
+          make ARCH=arm64 LLVM=1 CC=clang/bin/clang defconfig
+          make ARCH=arm64 LLVM=1 CC=clang/bin/clang modules_prepare
+
+      - name: Build Module
+        run: |
+          cd driver
+          make ARCH=arm64 LLVM=1 CC=../kernel-source/clang/bin/clang CROSS_COMPILE=aarch64-linux-gnu- KDIR=../kernel-source
+
+      - name: Upload Module
+        uses: actions/upload-artifact@v4
+        with:
+          name: nb9-driver-ko
+          path: driver/nb9_driver.ko
