@@ -1,4 +1,4 @@
-name: Build Kernel Module
+name: Build MemKernel Module
 
 on: [push, workflow_dispatch]
 
@@ -18,25 +18,40 @@ jobs:
         run: |
           git clone --depth 1 -b android16-6.12 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Prepare Kernel and Generate Module.symvers
+      - name: Prepare Kernel and Integrate MemKernel
         run: |
           cd kernel-source
+          # 1. Baixa o Clang do AOSP
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang-prebuilt
           CLANG_PATH=$(find $(pwd)/clang-prebuilt -name "clang-r*" -type d | head -n 1)
           export PATH=$CLANG_PATH/bin:$PATH
+          
+          # 2. Configura o kernel GKI
           make ARCH=arm64 LLVM=1 CC="clang" gki_defconfig
+          
+          # 3. Integra o MemKernel como módulo (M) e define o nome do device
+          # O script baixa o MemKernel, cria o symlink e ajusta o Kconfig/Makefile
+          curl -LSs "https://raw.githubusercontent.com/Poko-Apps/MemKernel/main/kernel/setup.sh" | bash -s M sa_log_wifi
+          
+          # 4. Garante que o módulo MEMKERNEL está habilitado na configuração
+          ./scripts/config --module MEMKERNEL
+          
+          # 5. Compila o kernel e os módulos (isso vai gerar o .ko do MemKernel)
           make ARCH=arm64 LLVM=1 CC="clang" -j$(nproc) modules
 
-      - name: Build Module
+      - name: Find and Upload Module
         run: |
-          cd driver
-          CLANG_PATH=$(find $(pwd)/../kernel-source/clang-prebuilt -name "clang-r*" -type d | head -n 1)
-          # A CORREÇÃO ESTÁ AQUI: Exportando o PATH para achar o ld.lld
-          export PATH=$CLANG_PATH/bin:$PATH
-          make ARCH=arm64 LLVM=1 CC="clang"
+          # Encontra o arquivo .ko gerado (ele terá o nome sa_log_wifi_memk.ko)
+          KO_FILE=$(find kernel-source -name "sa_log_wifi_memk.ko" | head -n 1)
+          if [ -z "$KO_FILE" ]; then
+            echo "ERRO: Arquivo .ko não encontrado!"
+            exit 1
+          fi
+          echo "Módulo encontrado: $KO_FILE"
+          cp "$KO_FILE" ./memkernel_driver.ko
 
-      - name: Upload Module
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nb9-driver-ko
-          path: driver/nb9_driver.ko
+          name: memkernel-driver
+          path: memkernel_driver.ko
