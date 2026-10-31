@@ -12,7 +12,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc flex bison libssl-dev libelf-dev git curl
+          # Adicionado 'libdw-dev' para corrigir o erro 'dwarf.h'
+          sudo apt-get install -y build-essential bc flex bison libssl-dev libelf-dev libdw-dev git curl
 
       - name: Download GKI Kernel (android16-6.12)
         run: |
@@ -21,15 +22,9 @@ jobs:
       - name: Prepare Kernel
         run: |
           cd kernel-source
-          
-          # Baixa o Clang do AOSP usando git clone (muito mais seguro que curl)
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang-prebuilt
-          
-          # Encontra a pasta exata do Clang
           CLANG_PATH=$(find $(pwd)/clang-prebuilt -name "clang-r*" -type d | head -n 1)
           export PATH=$CLANG_PATH/bin:$PATH
-          
-          # Configura o kernel do jeito que o GKI exige
           make ARCH=arm64 LLVM=1 CC="clang" gki_defconfig
           make ARCH=arm64 LLVM=1 CC="clang" modules_prepare
 
