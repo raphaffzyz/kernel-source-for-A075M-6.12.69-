@@ -25,14 +25,15 @@ jobs:
           CLANG_PATH=$(find $(pwd)/clang-prebuilt -name "clang-r*" -type d | head -n 1)
           export PATH=$CLANG_PATH/bin:$PATH
           make ARCH=arm64 LLVM=1 CC="clang" gki_defconfig
-          # A MÁGICA ACONTECE AQUI: Compilar os módulos internos para gerar o Module.symvers
           make ARCH=arm64 LLVM=1 CC="clang" -j$(nproc) modules
 
       - name: Build Module
         run: |
           cd driver
           CLANG_PATH=$(find $(pwd)/../kernel-source/clang-prebuilt -name "clang-r*" -type d | head -n 1)
-          make ARCH=arm64 LLVM=1 CC="${CLANG_PATH}/bin/clang" CROSS_COMPILE=aarch64-linux-gnu- KDIR=../kernel-source
+          # A CORREÇÃO ESTÁ AQUI: Exportando o PATH para achar o ld.lld
+          export PATH=$CLANG_PATH/bin:$PATH
+          make ARCH=arm64 LLVM=1 CC="clang"
 
       - name: Upload Module
         uses: actions/upload-artifact@v4
