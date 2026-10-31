@@ -1,10 +1,9 @@
 obj-m += nb9_driver.o
 
-# O GitHub Actions vai injetar o caminho do kernel aqui
-KDIR ?= $(PWD)/../kernel-source
+KDIR ?= ../kernel-source
 
 all:
-	make -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(CURDIR) ARCH=arm64 LLVM=1 modules
 
 clean:
-	make -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$(CURDIR) ARCH=arm64 LLVM=1 clean
