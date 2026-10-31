@@ -21,18 +21,23 @@ jobs:
       - name: Prepare Kernel
         run: |
           cd kernel-source
-          # Faz o download da toolchain Clang do AOSP
-          curl -sL https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz -o clang.tar.gz
-          mkdir clang
-          tar -xzf clang.tar.gz -C clang
-          # Prepara o kernel para compilar módulos externos
-          make ARCH=arm64 LLVM=1 CC=clang/bin/clang defconfig
-          make ARCH=arm64 LLVM=1 CC=clang/bin/clang modules_prepare
+          
+          # Baixa o Clang do AOSP usando git clone (muito mais seguro que curl)
+          git clone --depth 1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang-prebuilt
+          
+          # Encontra a pasta exata do Clang
+          CLANG_PATH=$(find $(pwd)/clang-prebuilt -name "clang-r*" -type d | head -n 1)
+          export PATH=$CLANG_PATH/bin:$PATH
+          
+          # Configura o kernel do jeito que o GKI exige
+          make ARCH=arm64 LLVM=1 CC="clang" gki_defconfig
+          make ARCH=arm64 LLVM=1 CC="clang" modules_prepare
 
       - name: Build Module
         run: |
           cd driver
-          make ARCH=arm64 LLVM=1 CC=../kernel-source/clang/bin/clang CROSS_COMPILE=aarch64-linux-gnu- KDIR=../kernel-source
+          CLANG_PATH=$(find $(pwd)/../kernel-source/clang-prebuilt -name "clang-r*" -type d | head -n 1)
+          make ARCH=arm64 LLVM=1 CC="${CLANG_PATH}/bin/clang" CROSS_COMPILE=aarch64-linux-gnu- KDIR=../kernel-source
 
       - name: Upload Module
         uses: actions/upload-artifact@v4
